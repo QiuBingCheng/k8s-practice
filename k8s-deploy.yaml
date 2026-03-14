@@ -1,0 +1,55 @@
+# 1. 定義「部署」 (Deployment) - 負責管容器的生死
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-deployment
+spec:
+  replicas: 1           # 想要跑幾個副本
+  selector:
+    matchLabels:
+      app: fastapi-app
+  template:
+    metadata:
+      labels:
+        app: fastapi-app
+    spec:
+      containers:
+      - name: fastapi-container
+        image: fastapi-url-shortener:latest
+        imagePullPolicy: IfNotPresent  # 關鍵：叫它用我們 import 進去的，別去網路上抓
+        ports:
+        - containerPort: 8000
+
+---
+
+# 2. 定義「服務」 (Service) - 負責分配流量
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-service
+spec:
+  selector:
+    app: fastapi-app
+  ports:
+    - protocol: TCP
+      port: 80          # Service 對外的門牌
+      targetPort: 8000  # 指向容器裡 Uvicorn 跑的 8000
+  type: LoadBalancer    # 這是重點！它會對接到我們剛才創叢集時設定的 8081 埠
+
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fastapi-ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: fastapi-service
+            port:
+              number: 80
